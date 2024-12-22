@@ -88,7 +88,7 @@ class MechanicalLegendExtractor:
         plt.vlines(x=self.column_split, ymin=0, ymax=self.binary_image.shape[0], colors='blue', linestyles='dashed')
 
         plt.title("Image with Labeled Rows and Two-Column Segmentation")
-        plt.savefig("segmentation3.png")
+        plt.savefig("segmentation_label.png")
         plt.show()
 
     def process_table(self) :
