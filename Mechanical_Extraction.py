@@ -1,3 +1,4 @@
+import json
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2
@@ -12,21 +13,20 @@ class MechanicalLegendExtractor:
         if self.image is None:
             raise ValueError(f"Could not read image at {image_path}")
 
-        self.gray = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
+        self.intensity_image = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
 
     def preprocess_image(self) -> np.ndarray:
         """Preprocess the image to improve text and symbol detection."""
         # Increase contrast
-        self.intensity_image = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
         threshold_value = 128
         self.image_array = np.array(self.intensity_image)
-        binary_image = (self.image_array > threshold_value).astype(np.uint8) * 255
+        self.binary_image = (self.image_array > threshold_value).astype(np.uint8) * 255
 
-        self.binary_image= binary_image
-        return binary_image
+        return self.binary_image
 
     def calculate_horizontal_intensity(self):
         self.horizontal_projection = np.sum(self.image_array, axis=1)
+        self.horizontal_line = np.argmax(self.image_array, axis=1)
 
         # Plot the horizontal projection
         plt.figure(figsize=(10, 6))
@@ -63,7 +63,7 @@ class MechanicalLegendExtractor:
             if row_indices[i] != row_indices[i - 1] + 1 and row_indices[i] - start > distance:
                 segments.append((start, row_indices[i]))
                 start = row_indices[i]
-        segments.append((start, row_indices[-1]))
+        # segments.append((start, row_indices[-1]))
 
         return segments
 
@@ -80,11 +80,12 @@ class MechanicalLegendExtractor:
 
     def draw_labeled_segmentation(self):
         # Draw row labels
+        plt.imshow(self.binary_image, cmap='gray', aspect='auto')
         for row in self.row_segments:
-            plt.hlines(y=row, xmin=0, xmax=self.image_array.shape[1], colors='red', linestyles='dashed')
+            plt.hlines(y=row, xmin=0, xmax=self.binary_image.shape[1], colors='red', linestyles='dashed')
 
         # Draw column split line
-        plt.vlines(x=self.column_split, ymin=0, ymax=self.image_array.shape[0], colors='blue', linestyles='dashed')
+        plt.vlines(x=self.column_split, ymin=0, ymax=self.binary_image.shape[0], colors='blue', linestyles='dashed')
 
         plt.title("Image with Labeled Rows and Two-Column Segmentation")
         plt.savefig("segmentation3.png")
@@ -98,7 +99,7 @@ class MechanicalLegendExtractor:
         self.calculate_vertical_intensity()
 
         # Detect edges
-        self.row_segments = self.white_pixel_based_row_segmentation()
+        self.row_segments = self.white_pixel_based_row_segmentation(self.horizontal_line, 20)
         self.col_segmentation()
 
         #draw the labeled segmentations
@@ -116,7 +117,7 @@ class MechanicalLegendExtractor:
         descriptions = []
         for i, (start_row, end_row) in enumerate(self.row_segments):
             # Extract the row
-            row_image = self.intensity_image[start_row:end_row, :]
+            row_image = self.binary_image[start_row:end_row, :]
 
             # Split the row into two columns using the previously identified column split
             first_column = row_image[:, :self.column_split]
@@ -139,9 +140,11 @@ class MechanicalLegendExtractor:
             "Description": descriptions
         })
 
+        self.results.to_json('result.json', default_handler=str, indent=True)
+
         print(self.results)
 
-    def display(self, output):
+    def display(self):
         # Convert DataFrame to a Matplotlib figure
         fig, ax = plt.subplots(figsize=(8, 2))  # Adjust figure size as needed
         ax.axis('tight')
@@ -165,5 +168,5 @@ def extract_mechanical_legend(image_path: str, output_path: str) -> None:
 if __name__ == "__main__":
     output_path = "extracted_symbols"
     pytesseract.pytesseract.tesseract_cmd = '/opt/homebrew/bin/tesseract'
-    image_path = 'mechanical1.png'
+    image_path = 'Mechanical Legend.png'
     extract_mechanical_legend(image_path,output_path)
